@@ -48,8 +48,8 @@ class Assembler:
 
         self.labels = {}
 
-    def assemble_file(self, file):
-        with open(file, 'r') as f:
+    def assemble_file(self, filename):
+        with open(filename, 'r') as f:
             return self.assemble([line for line in f])
 
     def assemble(self, lines):
@@ -58,8 +58,8 @@ class Assembler:
         j = 0
         to_be_assembled = []
         while i < len(lines):
-            line = lines[i][j:].lower().strip()
-            if len(line) == 0:
+            line = lines[i][j:].split(';')[0].lower().strip()
+            if not line:
                 i += 1
                 j = 0
                 continue
@@ -105,7 +105,8 @@ class Assembler:
         self.orig = None
 
     def process_stringz(self, line, lines, result, i):
-        text = lines[i].strip()[len('.stringz'):].strip()
+        text = lines[i].split('.stringz')[1].strip()
+        text = bytes(text, 'utf-8').decode('unicode_escape')
         assert (text[0] == '"' and text[-1] == '"')
         text = text[1:-1]
         for char in text:
@@ -124,8 +125,7 @@ class Assembler:
 
     @staticmethod
     def assert_max_digit_lengths(digits, lengths):
-        for i in range(len(digits)):
-            cur = digits[i]
+        for i, cur in enumerate(digits):
             if cur < 0:
                 cur = -cur
             if ~(~0x0 << lengths[i]) & cur != cur:

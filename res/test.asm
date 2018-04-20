@@ -59,13 +59,48 @@ __PUTS_TEMP_2__ .fill 0
 
 .orig x240
 __IN__
+ST R7, __IN__TEMP
+LEA R0, __IN__PROMPT
+PUTS
+GETC
+LD R7, __IN__TEMP
+RET
+__IN__TEMP .fill 0
+__IN__PROMPT .stringz "Enter a single character: "
 .end
 
-.orig x230
-__PUTSP__
+.orig x270
+__PUTSP__ 
+ST R0, __PUTSP_TEMP_0__
+ST R1, __PUTSP_TEMP_1__
+ST R2, __PUTSP_TEMP_2__
+__PUTSP_LOOP__
+LDR R2, R0, 0
+BRz __PUTSP_END__
+
+__PUTSP_OUT_LOOP__
+LDI R1, __DSR__
+BRzp __PUTSP_OUT_LOOP__
+LD R1, __PUTSP_MASK__
+AND R1, R1, R2
+STI R1, __DDR__
+AND R1, R1, 0
+; TODO add loop to get higher order bits
+
+ADD R0, R0, 1
+BR __PUTSP_LOOP__
+__PUTSP_END__
+LD R0, __PUTSP_TEMP_0__
+LD R1, __PUTSP_TEMP_1__
+LD R2, __PUTSP_TEMP_2__
+RET
+__PUTSP_TEMP_0__ .fill 0
+__PUTSP_TEMP_1__ .fill 0
+__PUTSP_TEMP_2__ .fill 0
+__PUTSP_MASK__   .fill x00FF
 .end
 
-.orig x250
+.orig x300
 __HALT__
     LD R0, __MCR__
     AND R1, R1, 0
@@ -74,26 +109,16 @@ __MCR__ .fill xFFFE
 .end
 
 .orig x3000
-LD R0, X
-LD R2, Y
-AND R1, R1, 0
-LOOP
-ADD R1, R1, R2
-ADD R0, R0, -1
-BRp LOOP
-LEA R0, S
-PUTS
 
-GETC
+IN
+ADD R1, R0, 0
+LEA R0, CONFIRM
+PUTS
+ADD R0, R1, 0
 OUT
-GETC
+LD R0, NEWLINE
 OUT
-GETC
-OUT
-GETC
-OUT
-GETC
-OUT
+
 
 BRp NOT_END
 END
@@ -110,5 +135,9 @@ Y
     .fill 60
 S
     .stringz "Done."
+CONFIRM
+    .stringz "You entered: "
+NEWLINE
+    .stringz "\n"
 
 .end

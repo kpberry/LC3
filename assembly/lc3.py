@@ -25,7 +25,12 @@ class LC3:
         self.ssp = 0x3000
         self.zero_registers()
         self.isr_registers = []
-        self.key_delay = 10
+        self.assembler = Assembler()
+        self.instrs = [
+            self.BR, self.ADD, self.LD, self.ST, self.JSR, self.AND,
+            self.LDR, self.STR, self.RTI, self.NOT, self.LDI,
+            self.STI, self.JMP, None, self.LEA, self.TRAP
+        ]
 
     def reset_device_registers(self):
         self.memory[LC3.kbsr] = 0
@@ -38,7 +43,8 @@ class LC3:
         self.memory = [0] * LC3.mem_size
 
     def randomize_memory(self):
-        self.memory = [randint(0, 1 << LC3.word_size) for _ in range(LC3.mem_size)]
+        self.memory = [randint(0, 1 << LC3.word_size)
+                       for _ in range(LC3.mem_size)]
 
     def zero_registers(self):
         self.registers = [0] * LC3.num_registers
@@ -48,12 +54,30 @@ class LC3:
             randint(0, 1 << LC3.word_size) for _ in range(LC3.num_registers)
         ]
 
-    def exec_line(self):
-        self.pc = 0x3000
-        t = threading.Thread(target=self.read_input)
+    def listen_for_input(self):
+        def read_input():
+            self.inputs += input()
+            self.listen_for_input()
+        t = threading.Thread(target=read_input)
         t.daemon = True
         t.start()
+
+    def exec_file(self, filename):
+        self.exec_memory(self.assembler.assemble_file(filename))
+
+    def exec_lines(self, lines):
+        self.exec_memory(self.assembler.assemble(lines))
+
+    def exec_memory(self, memory, origin=0x3000):
+        self.memory = memory
+        self.reset_device_registers()
+        self.pc = origin
+
+        self.listen_for_input()
+
+        key_delay = 0
         while self.memory[LC3.mcr] != 0:
+            key_delay += 1
             if self.memory[LC3.dsr] < 0 and self.memory[LC3.ddr] != 0:
                 sys.stdout.write(chr(self.memory[LC3.ddr]))
                 sys.stdout.flush()
@@ -67,33 +91,19 @@ class LC3:
 
             opcode = (self.instr >> 12) & 0xF
 
-            instrs = [
-                self.BR, self.ADD, self.LD, self.ST, self.JSR, self.AND,
-                self.LDR, self.STR, self.RTI, self.NOT, self.LDI,
-                self.STI, self.JMP, None, self.LEA, self.TRAP
-            ]
-
-            if instrs[opcode] is None:
+            if self.instrs[opcode] is None:
                 raise Exception('IllegalOpcodeException')
+            else:
+                self.instrs[opcode]()  # execute the current instruction
 
-            instrs[opcode]()
-
-            if self.memory[LC3.kbsr] & 0x8000 != 0 and len(self.inputs) > 0:
-                # For now, I'm going to be too lazy to actually figure this out
-                self.memory[LC3.kbdr] = ord(self.inputs[0])
+            if self.inputs:
+                cur_input = ord(self.inputs[0])
                 self.inputs = self.inputs[1:]
+                self.memory[LC3.kbsr] |= 0x8000
+                self.memory[LC3.kbdr] = cur_input
+                key_delay = 0
+            elif key_delay > 2:
                 self.memory[LC3.kbsr] &= 0x7FFF
-                t = threading.Thread(target=self.read_input)
-                t.daemon = True
-                t.start()
-                # self.psr &= 0x71FF
-                # self.psr |= 0x0400
-                # self.isr_registers.append(self.registers[6])
-                # self.registers[6] = self.ssp
-                # self.ssp -= 2
-                # self.memory[self.ssp] = self.pc
-                # self.memory[self.ssp + 1] = self.psr
-                # self.pc = self.memory[0x0180]
 
     def set_cc(self, v):
         self.psr &= 0xFFF8
@@ -211,10 +221,6 @@ class LC3:
         trap_vect_8 = bit_range(self.instr, 0, 8)
         self.pc = self.memory[trap_vect_8]
 
-    def read_input(self):
-        self.inputs += input()
-        self.memory[LC3.kbsr] |= 0x8000
-
 
 def bit_range(num, start, bits):
     return (num >> start) & ~(~0 << bits)
@@ -227,17 +233,5 @@ def sext_bit_range(num, start, bits):
         return -(-(num >> start) & ~(~0 << (bits - 1)))
 
 
-def test():
-    a = Assembler()
-
-    instrs = a.assemble_file('../res/test.asm')
-
-    l = LC3()
-    l.memory = instrs
-
-    l.reset_device_registers()
-
-    l.exec_line()
-
 if __name__ == '__main__':
-    test()
+    LC3().exec_file('../res/test.asm')
