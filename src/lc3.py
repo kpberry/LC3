@@ -3,7 +3,6 @@ import threading
 from random import randint
 
 from assembler import Assembler
-from disassembler import Disassembler
 
 
 class LC3:
@@ -237,5 +236,5 @@ def sext_bit_range(num, start, bits):
 if __name__ == '__main__':
     try:
         LC3().exec_file('../res/io_test.asm')
-    except:
+    except FileNotFoundError:
         LC3().exec_file('res/io_test.asm')

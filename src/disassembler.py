@@ -119,3 +119,5 @@ class Disassembler:
             return traps[index]
         else:
             return 'TRAP {}'.format(index)
+
+print('imported')
